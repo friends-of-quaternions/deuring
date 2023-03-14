@@ -146,7 +146,7 @@ class xPoint:
             assert isinstance(isopart, EllipticCurveIsogeny)
             assert isopart._EllipticCurveIsogeny__algorithm == 'kohel'
 
-            if (isom := isopart.get_pre_isomorphism()):
+            if (isom := isopart._EllipticCurveIsogeny__pre_isomorphism):
                 newX = isom.x_rational_map()(newX)
 
             phi = isopart._EllipticCurveIsogeny__phi
@@ -158,7 +158,7 @@ class xPoint:
                 newX = None
                 return xPoint(None, isogeny.codomain())
 
-            if (isom := isopart.get_post_isomorphism()):
+            if (isom := isopart._EllipticCurveIsogeny__post_isomorphism):
                 newX = isom.x_rational_map()(newX)
 
         new_curve = isogeny.codomain().base_extend(newX.parent())
