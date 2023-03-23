@@ -71,7 +71,7 @@ class KLPT_Context:
         Given an integral ideal I, returns a Minkowski-reduced basis of I
         """
         M = I.basis_matrix()
-        S = 2**ceil(log(self.p*self.q, 2))  #TODO figure out the optimal value for this
+        S = 2**(round(log(self.p*self.q, 2))+1)  #TODO figure out the optimal value for this
         D = diagonal_matrix(round(S * sqrt(g.reduced_norm())) for g in self.B.basis())
         return self.matrixToGens((M * D).LLL() * ~D)
 

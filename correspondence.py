@@ -15,15 +15,15 @@ from .klpt import KLPT_Context, DecompAlphaN
 
 from .xonly import xPoint, xISOG
 
-def Frob(P):
-    r"""
-    Given a point P on any elliptic curve over a finite field
-    whose coefficients lie in the prime field,
-    returns P evaluated in the frobenius endomorphism
-    """
-    E = P.curve()
-    p = E.base_field().characteristic()
-    return E(*(c**p for c in P))
+#def Frob(P):
+#    r"""
+#    Given a point P on any elliptic curve over a finite field
+#    whose coefficients lie in the prime field,
+#    returns P evaluated in the p-power frobenius endomorphism
+#    """
+#    E = P.curve()
+#    p = E.base_field().characteristic()
+#    return E(*(c**p for c in P))
 
 #TODO: can save isogeny evaluations by adding coprime-order points and decomposing them again post-evaluation
 #      - only makes sense for points defined over same fields... not so many of them
@@ -113,8 +113,20 @@ class Deuring_Context:
                 return pt.curve()(f(x,y), g(x,y))
             except ZeroDivisionError:   # Point is in the kernel
                 return pt.curve()(0)
+
+        frob = F2.frobenius_endomorphism()
+        def eval_j(pt):
+            r"""
+            Given a point P on E_0, returns P evaluated in the p-power frobenius endomorphism
+            """
+            if not pt:
+                return pt
+            x,y = pt.xy()
+            return pt.curve()(frob(x), frob(y))
+
         self.endo_i = eval_i
-        self.endo_j = Frob
+        E0.endo_i = eval_i
+        E0.endo_j = eval_j
 
 
     @cached_method
@@ -147,11 +159,12 @@ class Deuring_Context:
         E.endo_i = eval_i   #FIXME adding this attribute is quite a hack
 
         u = D**(self.p//2)
+        frob = Fbig.frobenius_endomorphism()
         def eval_j(pt):
             if not pt:
                 return pt
             x,y = pt.xy()
-            return pt.curve()(x**self.p * u**2, y**self.p * u**3)
+            return pt.curve()(frob(x) * u**2, frob(y) * u**3)
         E.endo_j = eval_j   #FIXME adding this attribute is quite a hack
 
         return E
@@ -168,9 +181,9 @@ class Deuring_Context:
         E = Q.curve()
         twist = hasattr(E, 'twist_D')
         if not twist:
-            iQ = self.endo_i(Q)
-            jQ = self.endo_j(Q)
-            kQ = self.endo_i(jQ)
+            iQ = E.endo_i(Q)
+            jQ = E.endo_j(Q)
+            kQ = E.endo_i(jQ)
         else:
             iQ = E.endo_i(Q)
             jQ = E.endo_j(Q)
@@ -318,6 +331,14 @@ class Deuring_Context:
         else:
             Fbig,A = E.base_field().extension(extdeg,'A').objgen()
             E = E.change_ring(Fbig)
+            frob = Fbig.frobenius_endomorphism()
+            def eval_j(pt):
+                if not pt:
+                    return pt
+                x,y = pt.xy()
+                return pt.curve()(frob(x), frob(y))
+            E.endo_j = eval_j
+            E.endo_i = self.endo_i
 
         order = self.p**extdeg - (-1 if twist else +1) * (-1)**extdeg
         E.set_order(order**2, num_checks=0)
@@ -342,9 +363,15 @@ class Deuring_Context:
             return T, Tl
 
         P,Pl = rpt()
-        Q,Ql = rpt()
-        while Pl.weil_pairing(Ql,l).is_one():
+        Q = E.endo_i(P)
+        if Pl.weil_pairing(l**(e-1)*Q,l).is_one():
+            Q = E.endo_j(P)
+        Q.set_order(l**e)
+        if Pl.weil_pairing(l**(e-1)*Q,l).is_one():
+            verbose(f"neither i(P) nor j(P) was linearly independent for {l**e}")
             Q,Ql = rpt()
+            while Pl.weil_pairing(Ql,l).is_one():
+                Q,Ql = rpt()
 
         if xOnly:
             D = E.twist_D if twist else 1
