@@ -13,17 +13,19 @@ Requires that O_0 is a special p-extremal maximal order in the quaternion algebr
 Based on the seminal paper by Kohel, Lauter, Petit and Tignol: https://eprint.iacr.org/2014/505.pdf
 """
 
-def cornacchiaFriendly(n, B=2**20):
+def cornacchiaFriendly(n, q, B=2**8):
     r"""
-    Given a number n, checks if a n is "Cornacchia Friendly" (= easily factorable)
+    Given a number n, q, checks if a n is "Cornacchia Friendly" (= easily factorable and solution probably exists)
     """
     n = ZZ(n)
     if n < 0:
         return False
-    if n < 2**160:
-        return True
-    l,_ = n.factor(limit=B)[-1]
-    return l < 2**160 or is_pseudoprime(l)
+    #if n < 2**100:
+    #    return True
+    fac_n = [l for l, e in n.factor(limit=B)]
+    if not is_pseudoprime(fac_n[-1]):
+        return False
+    return all((l == 2 or kronecker(-q, l) != -1) for l in fac_n)
 
 def linearCombinations(m):
     for a1 in range(0, m+1):
@@ -111,7 +113,7 @@ class KLPT_Context:
         for z in range(1, m):
             for t in range(m):
                 Mm = M - self.p*self.QF(z,t)
-                if cornacchiaFriendly(Mm):
+                if cornacchiaFriendly(Mm, self.q):
                     sol = self.QF.solve_integer(Mm)
                     if sol:
                         return sol[0] + self.i*sol[1] + self.j*(z + self.i*t)
@@ -181,8 +183,8 @@ class KLPT_Context:
                 assert M%(N**2) == 0
                 M = M // N**2
                 verbose(f"{M=}")
-                if cornacchiaFriendly(M):
-                    verbose(f"Easily factorable!")
+                if cornacchiaFriendly(M, self.q):
+                    verbose(f"Cornacchia solution should exist!")
                     sol = self.QF.solve_integer(M)
                 else:
                     sol = None

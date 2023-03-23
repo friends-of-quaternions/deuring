@@ -12,7 +12,7 @@ def random_ideal(O):
     assert p.is_pseudoprime()
 
     I = O.unit_ideal()
-    for it in reversed(range(55+2*ceil(log(p,2)))):   #TODO figure out good bound
+    for it in reversed(range(55+2*round(log(p,2)))):   #TODO figure out good bound
         O = I.right_order()
         while True:
             beta = sum(randint(1,10**4)*a for a in O.basis())
@@ -28,4 +28,3 @@ def random_ideal(O):
             I *= el.conjugate() / I.norm()
 #        print(f'{it:4}', I)
     return I
-
