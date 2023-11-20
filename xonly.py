@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 from sage.all import *
+from sage.misc.verbose import verbose
 from sage.schemes.elliptic_curves.hom_composite import EllipticCurveHom_composite
 
 def xDBL(a, b, X1):

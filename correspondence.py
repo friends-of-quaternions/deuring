@@ -3,6 +3,7 @@
 import collections
 
 from sage.all import *
+from sage.misc.verbose import verbose
 from sage.schemes.elliptic_curves.hom_composite import EllipticCurveHom_composite
 
 from .klpt import KLPT_Context, DecompAlphaN
@@ -410,7 +411,8 @@ def constructive_deuring(I, E0, iota, variant=None):
     """
     O0 = I.left_order()
     KLPT_ctx = KLPT_Context(O0.quaternion_algebra())
-    EllipticCurveHom_composite.make_default()   #TODO can be removed in Sage >= 9.8
+    if not sage.misc.banner.require_version(9,8):
+        EllipticCurveHom_composite.make_default()  #TODO remove once everyone runs Sage >= 9.8
 
     J, facToExt, T, S, f = KLPT_ctx.KLPT(I, variant=variant)
     print(f'norm(J) = {factor(J.norm())}')

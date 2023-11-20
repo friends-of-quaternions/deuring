@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 from sage.all import *
+from sage.misc.verbose import verbose
 from collections import defaultdict
 
 r"""

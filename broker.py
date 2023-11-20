@@ -65,8 +65,8 @@ def starting_curve(F):
     Construct a starting curve over a given model of 𝔽p², using
     Bröker's algorithm and Ibukiyama's maximal orders.
     """
-    from sage.rings.finite_rings.finite_field_base import is_FiniteField
-    if not is_FiniteField(F) or F.degree() != 2:
+    from sage.rings.finite_rings.finite_field_base import FiniteField
+    if not isinstance(F, FiniteField) or F.degree() != 2:
         raise TypeError('not 𝔽p²')
 
     p = F.characteristic()
