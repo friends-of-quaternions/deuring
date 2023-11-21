@@ -87,7 +87,7 @@ class Deuring_Context:
     r"""
     Helper to setup parameters for computing the Deuring correspondence.
     """
-    def __init__(self, O0, E0, iota, facToExt, T, S, f, J=None):
+    def __init__(self, O0, E0, iota, facToExt, T, S=None, f=None, J=None):
         self.O0 = O0
         self.E0 = E0
         F2 = E0.base_field()
