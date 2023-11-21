@@ -74,7 +74,7 @@ def choose_torsion(p, q, N, lowbound, newconst=None):
     le = ZZ.one()
     while lcm(le for le in facToExt.keys()) < lowbound*2*q:
         le += 1
-        if p.divides(le):
+        if p.divides(le) or N.divides(le):
             continue
         if not is_pseudoprime(le.radical()):
             continue
