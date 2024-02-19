@@ -160,6 +160,16 @@ class Deuring_Context:
         aQ = coeffs[0]*Q + coeffs[1]*iQ + coeffs[2]*jQ + coeffs[3]*kQ
         return aQ
 
+    def _precompute_torsion_bases(self, Eles):
+        from os import cpu_count
+        for (Ele,_), (EE,emb, P,Q) in parallel(cpu_count())(self.genTorsionBasis)(Eles):
+            self.genTorsionBasis.set_cache((EE,emb, P,Q), *Ele)
+            assert emb.domain() is self.E0.base_ring()
+            assert emb.codomain() is P.base_ring() is Q.base_ring()
+            if (emb0 := emb.codomain().coerce_map_from(emb.domain())) is None:
+                emb.codomain().register_coercion(emb)
+            assert emb.codomain().coerce_map_from(emb.domain()) == emb
+
     def IdealToIsogenyGens(self, I, specificTorsion=0):
         r"""
         Given a left O0-ideal I, returns {P_1, .., P_n} such that ker phi_I = <P_1, .., P_n>
@@ -168,6 +178,8 @@ class Deuring_Context:
         a = DecompAlphaN(I)
         d = lcm(c.denominator() for c in a)
         N = ZZ(I.norm()).gcd(specificTorsion) if specificTorsion else ZZ(I.norm())
+
+        self._precompute_torsion_bases([(self.E0, l, e+d.valuation(l)) for l,e in N.factor()])
 
         for (l,e) in N.factor():
             lval = d.valuation(l)  # point divisions
