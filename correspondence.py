@@ -16,16 +16,6 @@ from .klpt import KLPT_Context, DecompAlphaN
 
 from .xonly import xPoint, xISOG
 
-def Frob(P):
-    r"""
-    Given a point P on any elliptic curve over a finite field
-    whose coefficients lie in the prime field,
-    returns P evaluated in the frobenius endomorphism
-    """
-    E = P.curve()
-    p = E.base_field().characteristic()
-    return E(*(c**p for c in P))
-
 #TODO: can save isogeny evaluations by adding coprime-order points and decomposing them again post-evaluation
 #      - only makes sense for points defined over same fields... not so many of them
 #TODO: √élu for last bunch of isogenies
@@ -83,6 +73,39 @@ def multiplyIdeals(I, J, beta=None):
 #                                   #
 #####################################
 
+class TwistedCurveWithEndomorphism:
+    def __init__(self, E, D, iota_maps):
+        _,_,_,a,b = E.a_invariants()
+        if E != EllipticCurve([a,b]):
+            raise NotImplementedError
+
+        self.E = EllipticCurve([a/D**2, b/D**3])
+        self.D = D
+
+        (fnum,fden), (gnum,gden) = iota_maps
+        x,y = Sequence([fnum,fden,gnum,gden]).universe().gens()
+        self.f = fnum(x=D*x), fden(x=D*x)*D
+        assert gnum.coefficient({y:1})*y == gnum
+        assert set(gden.variables()) <= {x}
+        self.g = gnum.coefficient({y:1})(x=D*x)*y, gden(x=D*x)
+
+        self.p = E.base_field().characteristic()
+        self.u = D**(self.p//2)
+
+    def eval_i(self, pt):
+        assert pt in self.E
+        if not pt:
+            return pt
+        x,y = pt.xy()
+        return self.E(self.f[0](x,y)/self.f[1](x,y), self.g[0](x,y)/self.g[1](x,y))
+
+    def eval_j(self, pt):
+        assert pt in self.E
+        if not pt:
+            return pt
+        x,y = pt.xy()
+        return self.E(x**self.p * self.u**2, y**self.p * self.u**3)
+
 class Deuring_Context:
     r"""
     Helper to setup parameters for computing the Deuring correspondence.
@@ -100,85 +123,42 @@ class Deuring_Context:
         self.f = f
         self.J = J
 
-        def eval_i(pt):
-            r"""
-            Given a point P on E_0, returns P evaluated in iota,
-            where iota corresponds to i in O_0 under the isomorphism E_0 -> O_0
-            """
-            if not pt:
-                return pt
-            x,y = pt.xy()
-            R = pt.base_ring()['x,y'].fraction_field()
-            f,g = map(R, iota.rational_maps())
-            try:
-                return pt.curve()(f(x,y), g(x,y))
-            except ZeroDivisionError:   # Point is in the kernel
-                return pt.curve()(0)
-        self.endo_i = eval_i
-        self.endo_j = Frob
-
-
     @cached_method
-    def twistE0(self, extdeg):
+    def extE0(self, extdeg, twist):
         r"""
-        Returns a quadratic twist \widetilde{E_0} of E_0 over F_{p^2k}.
+        Returns either a base-change of E_0 over F_{p^2k},
+        or a quadratic twist \widetilde{E_0} of E_0 over F_{p^2k}.
         The twist has its own isomorphism \widetilde{E_0} -> O_0
         """
-        Fbig,A = self.E0.base_field().extension(extdeg,'A').objgen()
+        Fbig,emb = self.E0.base_field().extension(extdeg,'A', map=True)
         E0big = self.E0.change_ring(Fbig)
-        while True:
-            D = Fbig.random_element()
-            if not D.is_square():
-                break
-        _,_,_,a,b = E0big.a_invariants()
-        assert E0big == EllipticCurve([a,b])
-        E = EllipticCurve([a/D**2, b/D**3])
-        assert E.is_isomorphic(E0big.quadratic_twist())
-        E.twist_D = D       #FIXME adding this attribute is quite a hack
+        if twist:
+            while True:
+                D = Fbig.random_element()
+                if not D.is_square():
+                    break
+        else:
+            D = Fbig.one()
 
-        R,(x,y) = Fbig['x,y'].fraction_field().objgens()
-        f,g = map(R, self.iota.rational_maps())
-        f = f(x=D*x) / D
-        g = (g//y)(x=D*x) * y
-        def eval_i(pt):
-            if not pt:
-                return pt
-            x,y = pt.xy()
-            return pt.curve()(f(x,y), g(x,y))
-        E.endo_i = eval_i   #FIXME adding this attribute is quite a hack
+        iota_maps = tuple(tuple(g.map_coefficients(emb)
+                                for g in (f.numerator(), f.denominator()))
+                          for f in self.iota.rational_maps())
 
-        u = D**(self.p//2)
-        def eval_j(pt):
-            if not pt:
-                return pt
-            x,y = pt.xy()
-            return pt.curve()(x**self.p * u**2, y**self.p * u**3)
-        E.endo_j = eval_j   #FIXME adding this attribute is quite a hack
+        return TwistedCurveWithEndomorphism(E0big, D, iota_maps), emb
 
-        return E
-
-
-    def evalIdealElt(self, a, Q):
+    def evalIdealElt(self, EE, a, Q):
         r"""
         Given an endomorphism a and a point Q of
         order coprime to the denominator of a,
         returns a(Q)
         """
-        assert Q
         d = lcm(c.denominator() for c in a)
-        E = Q.curve()
-        twist = hasattr(E, 'twist_D')
-        if not twist:
-            iQ = self.endo_i(Q)
-            jQ = self.endo_j(Q)
-            kQ = self.endo_i(jQ)
-        else:
-            iQ = E.endo_i(Q)
-            jQ = E.endo_j(Q)
-            kQ = E.endo_i(jQ)
+        iQ = EE.eval_i(Q)
+        jQ = EE.eval_j(Q)
+        kQ = EE.eval_i(jQ)
         coeffs = [coeff % Q.order() for coeff in a]
         aQ = coeffs[0]*Q + coeffs[1]*iQ + coeffs[2]*jQ + coeffs[3]*kQ
-        return aQ, (E.twist_D if twist else 1)
+        return aQ
 
     def IdealToIsogenyGens(self, I, specificTorsion=0):
         r"""
@@ -188,13 +168,16 @@ class Deuring_Context:
         a = DecompAlphaN(I)
         d = lcm(c.denominator() for c in a)
         N = ZZ(I.norm()).gcd(specificTorsion) if specificTorsion else ZZ(I.norm())
+
         for (l,e) in N.factor():
             lval = d.valuation(l)  # point divisions
-            P, Q = self.genTorsionBasis(self.E0, l, e+lval)
-            R,twD = self.evalIdealElt(l**lval * a.conjugate(), P)
+            EE,emb, P,Q = self.genTorsionBasis(self.E0, l, e+lval)
+            assert P in EE.E and Q in EE.E
+            assert EE.E.base_ring().has_coerce_map_from(self.E0.base_ring())
+            R = self.evalIdealElt(EE, l**lval * a.conjugate(), P)
             if not l**(e-1) * R:
-                R,twD = self.evalIdealElt(l**lval * a.conjugate(), Q)
-            kerGens.append((xPoint(R.xy()[0]*twD, self.E0.change_ring(R.base_ring())), (l,e)))
+                R = self.evalIdealElt(EE, l**lval * a.conjugate(), Q)
+            kerGens.append((xPoint(R.xy()[0]*EE.D, self.E0.change_ring(emb)), (l,e)))
         return kerGens
 
     def IdealToIsogeny(self, I, specificTorsion=0):
@@ -312,23 +295,18 @@ class Deuring_Context:
         twist = not t.divides(self.p**extdeg - (-1)**extdeg)
         verbose(f"Generating torsion basis for E[{l}^{e}] over F_p^{2*extdeg}" + (" on quadratic twist" if twist else ""))
 
-        if twist:
-            assert E is self.E0
-            E = self.twistE0(extdeg)
-            Fbig = E.base_field()
-        else:
-            Fbig,A = E.base_field().extension(extdeg,'A').objgen()
-            E = E.change_ring(Fbig)
+        F = E.base_field()
+        EE,emb = self.extE0(extdeg, twist)
 
         order = self.p**extdeg - (-1 if twist else +1) * (-1)**extdeg
-        E.set_order(order**2, num_checks=0)
+        EE.E.set_order(order**2, num_checks=0)
         assert t.divides(order)
 
         cof = order.prime_to_m_part(l)
 
         def rpt():
             while True:
-                T = cof * E.random_point()
+                T = cof * EE.E.random_point()
                 Tl = l**(e-1)*T
                 if Tl: break
             U = l*Tl
@@ -348,10 +326,11 @@ class Deuring_Context:
             Q,Ql = rpt()
 
         if xOnly:
-            D = E.twist_D if twist else 1
-            P = xPoint(P.xy()[0]*D, self.E0.change_ring(Fbig))
-            Q = xPoint(Q.xy()[0]*D, self.E0.change_ring(Fbig))
-        return P, Q
+            P = xPoint(P.xy()[0]*EE.D, self.E0.change_ring(emb))
+            Q = xPoint(Q.xy()[0]*EE.D, self.E0.change_ring(emb))
+            return P, Q
+
+        return EE,emb, P,Q
 
     def IdealToIsogeny_S(self, I):
         r"""
