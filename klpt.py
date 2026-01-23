@@ -284,12 +284,15 @@ class KLPT_Context:
                     break
             if not nu:
                 bannedIdeals.append(II)
-                T = None
+#                T = None
 
         beta = gamma*nu
         denom = gcd(O0.unit_ideal().basis_matrix().solve_left((II * (beta.conjugate()/N)).basis_matrix()).list())
         return_alpha = beta / denom * alpha_marked / N
         I *= return_alpha.conjugate() / I.norm()
+
+        assert ZZ(I.norm()).divides(T)
+
         if returnElem:
             return return_alpha, I, facToExt, T, S, f
         return I, facToExt, T, S, f
