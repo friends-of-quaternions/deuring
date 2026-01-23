@@ -53,7 +53,7 @@ def chain_iso(kernelPointsIn, E):
 
         philist.append(phi)
 
-    return EllipticCurveHom_composite.from_factors(philist)
+    return EllipticCurveHom_composite.from_factors(philist, E)
 
 #####################################
 #                                   #
