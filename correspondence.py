@@ -412,8 +412,6 @@ def constructive_deuring(I, E0, iota, variant=None):
     """
     O0 = I.left_order()
     KLPT_ctx = KLPT_Context(O0.quaternion_algebra())
-    if not sage.misc.banner.require_version(9,8):
-        EllipticCurveHom_composite.make_default()  #TODO remove once everyone runs Sage >= 9.8
 
     J, facToExt, T, S, f = KLPT_ctx.KLPT(I, variant=variant)
     print(f'norm(J) = {factor(J.norm())}')
