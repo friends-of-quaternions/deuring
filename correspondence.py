@@ -243,7 +243,8 @@ class Deuring_Context:
         """
         kerGens = self.dualIsoGens(phi, degree)
         phihat = chain_iso(kerGens, phi.codomain())
-        varphi = phihat.codomain().isomorphism_to(phi.domain())  #TODO This might return the dual composed with some automorphism. Does it matter?
+        from sage.schemes.elliptic_curves.hom import find_post_isomorphism
+        varphi = find_post_isomorphism(phihat * phi, phi.domain().scalar_multiplication(degree))
         return varphi * phihat
 
     def IdealToIsogenyCoprime(self, J, K, phi_K, alpha):
