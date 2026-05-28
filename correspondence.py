@@ -107,7 +107,10 @@ class TwistedCurveWithEndomorphism:
         if not pt:
             return pt
         x,y = pt.xy()
-        return self.E(self.f[0](x,y)/self.f[1](x,y), self.g[0](x,y)/self.g[1](x,y))
+        try:
+            return self.E(self.f[0](x,y)/self.f[1](x,y), self.g[0](x,y)/self.g[1](x,y))
+        except ZeroDivisionError:
+            return self.E.zero()
 
     def eval_j(self, pt):
         assert pt in self.E
